@@ -19,17 +19,14 @@ from .owmapi import OWMApi, LocationNotFoundError
 import mycroft.audio
 from adapt.intent import IntentBuilder
 from multi_key_dict import multi_key_dict
-from mycroft.skills.core import MycroftSkill, intent_handler
+from mycroft import MycroftSkill, intent_handler
 from mycroft.messagebus.message import Message
-from mycroft.util.format import nice_date, nice_time
+from mycroft.util.format import nice_date
 from mycroft.util.format import nice_number, pronounce_number, join_list
-from mycroft.util.parse import extract_datetime, extract_number
+from mycroft.util.parse import extract_number
+from .util import extract_datetime, nice_time, to_local, to_time_period
 from requests import HTTPError
 
-try:
-    from mycroft.util.time import to_utc, to_local
-except Exception:
-    pass
 
 """
     This skill uses the Open Weather Map API (https://openweathermap.org) and
@@ -224,10 +221,8 @@ class WeatherSkill(MycroftSkill):
         try:
             self.log.debug("Handler: handle_current_weather")
             # Get a date from requests like "weather for next Tuesday"
-            today, _ = self.__extract_datetime("today")
-            when, _ = self.__extract_datetime(
-                message.data.get("utterance"), lang=self.lang
-            )
+            today, _ = extract_datetime("today")
+            when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
             if today != when:
                 self.log.debug("Doing a forecast {} {}".format(today, when))
                 return self.handle_forecast(message)
@@ -307,7 +302,7 @@ class WeatherSkill(MycroftSkill):
             day_num = 1
             day = message.data["day_one"]
             while day:
-                day_dt, _ = self.__extract_datetime(day)
+                day_dt, _ = extract_datetime(day)
                 days.append(day_dt)
                 day_num += 1
                 next_day = "day_{}".format(pronounce_number(day_num))
@@ -335,7 +330,7 @@ class WeatherSkill(MycroftSkill):
 
         report = self.__initialize_report(message)
         # report x number of days
-        when, _ = self.__extract_datetime("tomorrow")
+        when, _ = extract_datetime("tomorrow")
         num_days = int(extract_number(message.data["num"]))
 
         if self.voc_match(message.data["num"], "Couple"):
@@ -356,8 +351,8 @@ class WeatherSkill(MycroftSkill):
         report = self.__initialize_report(message)
 
         # Get a date from spoken request
-        when = self.__extract_datetime(message.data.get("utterance"), lang=self.lang)[0]
-        today = self.__extract_datetime("today")[0]
+        when = extract_datetime(message.data.get("utterance"), lang=self.lang)[0]
+        today = extract_datetime("today")[0]
 
         if today == when:
             self.handle_current_weather(message)
@@ -414,8 +409,8 @@ class WeatherSkill(MycroftSkill):
     )
     def handle_weather_at_time(self, message):
         self.log.debug("Handler: handle_weather_at_time")
-        when, _ = self.__extract_datetime(message.data.get("utterance"), lang=self.lang)
-        now = self.__to_UTC(datetime.utcnow())
+        when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
+        now = datetime.utcnow().replace(tzinfo=pytz.utc)
         time_diff = when - now
         mins_diff = (time_diff.days * 1440) + (time_diff.seconds / 60)
 
@@ -442,9 +437,9 @@ class WeatherSkill(MycroftSkill):
         """ Handle next weekends weather """
 
         report = self.__initialize_report(message)
-        when, _ = self.__extract_datetime("next saturday", lang="en-us")
+        when, _ = extract_datetime("next saturday", lang="en-us")
         self.report_forecast(report, when)
-        when, _ = self.__extract_datetime("next sunday", lang="en-us")
+        when, _ = extract_datetime("next sunday", lang="en-us")
         self.report_forecast(report, when)
 
     @intent_handler(
@@ -460,9 +455,9 @@ class WeatherSkill(MycroftSkill):
         report = self.__initialize_report(message)
 
         # Get a date from spoken request
-        when, _ = self.__extract_datetime("this saturday", lang="en-us")
+        when, _ = extract_datetime("this saturday", lang="en-us")
         self.report_forecast(report, when)
-        when, _ = self.__extract_datetime("this sunday", lang="en-us")
+        when, _ = extract_datetime("this sunday", lang="en-us")
         self.report_forecast(report, when)
 
     @intent_handler(
@@ -477,8 +472,8 @@ class WeatherSkill(MycroftSkill):
         """ Handle weather for week.
             Speaks overview of week, not daily forecasts """
         report = self.__initialize_report(message)
-        when, _ = self.__extract_datetime(message.data["utterance"])
-        today, _ = self.__extract_datetime("today")
+        when, _ = extract_datetime(message.data["utterance"])
+        today, _ = extract_datetime("today")
         if not when:
             when = today
         days = [when + timedelta(days=i) for i in range(7)]
@@ -866,8 +861,8 @@ class WeatherSkill(MycroftSkill):
         report = self.__initialize_report(message)
 
         # Get a date from spoken request
-        today, _ = self.__extract_datetime("today")
-        when, _ = self.__extract_datetime(message.data.get("utterance"), lang=self.lang)
+        today, _ = extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
 
         # search the forecast for precipitation
         weathers = self.owm.daily_forecast(
@@ -932,8 +927,8 @@ class WeatherSkill(MycroftSkill):
     def handle_humidity(self, message):
         report = self.__initialize_report(message)
 
-        when, _ = self.__extract_datetime(message.data.get("utterance"), lang=self.lang)
-        today, _ = self.__extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
+        today, _ = extract_datetime("today")
         if when == today:
             weather = self.owm.weather_at_place(
                 report["full_location"], report["lat"], report["lon"]
@@ -971,8 +966,8 @@ class WeatherSkill(MycroftSkill):
     def handle_windy(self, message):
         report = self.__initialize_report(message)
 
-        when, _ = self.__extract_datetime(message.data.get("utterance"))
-        today, _ = self.__extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"))
+        today, _ = extract_datetime("today")
         if when == today:
             weather = self.owm.weather_at_place(
                 report["full_location"], report["lat"], report["lon"]
@@ -1066,8 +1061,8 @@ class WeatherSkill(MycroftSkill):
     def handle_sunrise(self, message):
         report = self.__initialize_report(message)
 
-        when, _ = self.__extract_datetime(message.data.get("utterance"))
-        today, _ = self.__extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"))
+        today, _ = extract_datetime("today")
         if when == today:
             weather = self.owm.weather_at_place(
                 report["full_location"], report["lat"], report["lon"]
@@ -1092,8 +1087,11 @@ class WeatherSkill(MycroftSkill):
         # uses device tz so if not set (eg Mark 1) this is UTC.
         dtSunrise = datetime.fromtimestamp(weather.get_sunrise_time())
         if time.tzname == ("UTC", "UTC"):
-            dtSunrise = self.__to_Local(dtSunrise.replace(tzinfo=pytz.utc))
-        spoken_time = self.__nice_time(dtSunrise, use_ampm=True)
+            dtSunrise = to_local(
+                dtSunrise.replace(tzinfo=pytz.utc),
+                location_code=self.location["timezone"]["code"],
+            )
+        spoken_time = nice_time(dtSunrise, use_ampm=True)
         self.speak_dialog("sunrise", {"time": spoken_time})
 
     # Handle: When is the sunset?
@@ -1107,8 +1105,8 @@ class WeatherSkill(MycroftSkill):
     def handle_sunset(self, message):
         report = self.__initialize_report(message)
 
-        when, _ = self.__extract_datetime(message.data.get("utterance"))
-        today, _ = self.__extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"))
+        today, _ = extract_datetime("today")
         if when == today:
             weather = self.owm.weather_at_place(
                 report["full_location"], report["lat"], report["lon"]
@@ -1133,8 +1131,11 @@ class WeatherSkill(MycroftSkill):
         # uses device tz so if not set (eg Mark 1) this is UTC.
         dtSunset = datetime.fromtimestamp(weather.get_sunset_time())
         if time.tzname == ("UTC", "UTC"):
-            dtSunset = self.__to_Local(dtSunset.replace(tzinfo=pytz.utc))
-        spoken_time = self.__nice_time(dtSunset, use_ampm=True)
+            dtSunset = to_local(
+                dtSunset.replace(tzinfo=pytz.utc),
+                location_code=self.location["timezone"]["code"],
+            )
+        spoken_time = nice_time(dtSunset, use_ampm=True)
         self.speak_dialog("sunset", {"time": spoken_time})
 
     def __get_location(self, message):
@@ -1188,8 +1189,8 @@ class WeatherSkill(MycroftSkill):
 
     def __handle_typed(self, message, response_type):
         # Get a date from requests like "weather for next Tuesday"
-        today, _ = self.__extract_datetime("today")
-        when, _ = self.__extract_datetime(message.data.get("utterance"), lang=self.lang)
+        today, _ = extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
 
         report = self.__initialize_report(message)
         if today.date() != when.date():
@@ -1208,8 +1209,8 @@ class WeatherSkill(MycroftSkill):
     def __populate_report(self, message):
         unit = self.__get_requested_unit(message)
         # Get a date from requests like "weather for next Tuesday"
-        today, _ = self.__extract_datetime("today")
-        when, _ = self.__extract_datetime(message.data.get("utterance"), lang=self.lang)
+        today, _ = extract_datetime("today")
+        when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
         self.log.debug("extracted when: {}".format(when))
 
         report = self.__initialize_report(message)
@@ -1269,7 +1270,9 @@ class WeatherSkill(MycroftSkill):
         report["wind"] = self.get_wind_speed(fc_weather)[0]
 
         fc_time = fc_weather.get_reference_time(timeformat="date")
-        report["time"] = self.__to_time_period(self.__to_Local(fc_time))
+        report["time"] = to_time_period(
+            to_local(fc_time, location_code=self.location["timezone"]["code"])
+        )
         report["day"] = self.__to_day(when, preface=True)
 
         return report
@@ -1474,7 +1477,7 @@ class WeatherSkill(MycroftSkill):
                                 eg "on Tuesday" but NOT "on tomorrow"
         """
 
-        today, _ = self.__extract_datetime("today")
+        today, _ = extract_datetime("today")
         if when is None:
             when = today
 
@@ -1570,7 +1573,7 @@ class WeatherSkill(MycroftSkill):
         # Report a specific value
         data = {"condition": name, "value": value}
         report_type = "report.condition"
-        today, _ = self.__extract_datetime("today")
+        today, _ = extract_datetime("today")
         if when != today:
             data["day"] = self.__to_day(when, preface=True)
             report_type += ".future"
@@ -1721,57 +1724,6 @@ class WeatherSkill(MycroftSkill):
             speakable_date = speakable_date.split(",")[0]
         return speakable_date
 
-    def __to_UTC(self, when):
-        """
-            Convert the Timezone of the Datetime from any Timezone to
-            UTC Timezone while retaining the time.
-
-            Arguments:
-                when (datetime)
-            Returns:
-                (datetime): when but with Timezone replaced to UTC
-        """
-        return when.replace(tzinfo=pytz.utc)
-
-    def __to_Local(self, when):
-        try:
-            # First try with modern mycroft.util.time functions
-            return to_local(when)
-        except Exception:
-            # Fallback to the old pytz code
-            if not when.tzinfo:
-                when = when.replace(tzinfo=pytz.utc)
-            timezone = pytz.timezone(self.location["timezone"]["code"])
-            return when.astimezone(timezone)
-
-    def __to_time_period(self, when):
-        # Translate a specific time '9am' to period of the day 'morning'
-        hour = when.time().hour
-        period = None
-        if hour >= 1 and hour < 5:
-            period = "early morning"
-        if hour >= 5 and hour < 12:
-            period = "morning"
-        if hour >= 12 and hour < 17:
-            period = "afternoon"
-        if hour >= 17 and hour < 20:
-            period = "evening"
-        if hour >= 20 or hour < 1:
-            period = "overnight"
-        if period is None:
-            self.log.error("Unable to parse time as a period of day")
-        return period
-
-    # Suggestion TODO: Add a parameter to extract_datetime to add a default Timezone
-    def __extract_datetime(self, text, anchorDate=None, lang=None, default_time=None):
-        # Change timezone returned by extract_datetime from Local to UTC
-        extracted_dt = extract_datetime(text, anchorDate, lang, default_time)
-        if extracted_dt is None:
-            # allow calls to unpack values even if None returned.
-            return (None, None)
-        when, text = extracted_dt
-        return self.__to_UTC(when), text
-
     def __translate(self, condition, future=False, data=None):
         # behaviour of method dialog_renderer.render(...) has changed - instead
         # of exception when given template is not found now simply the
@@ -1782,15 +1734,6 @@ class WeatherSkill(MycroftSkill):
             return self.translate(condition, data)
         else:
             return condition
-
-    def __nice_time(
-        self, dt, lang="en-us", speech=True, use_24hour=False, use_ampm=False
-    ):
-        # compatibility wrapper for nice_time
-        nt_supported_languages = ["en", "es", "it", "fr", "de", "hu", "nl", "da"]
-        if not (lang[0:2] in nt_supported_languages):
-            lang = "en-us"
-        return nice_time(dt, lang, speech, use_24hour, use_ampm)
 
 
 def create_skill():
