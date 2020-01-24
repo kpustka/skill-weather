@@ -739,14 +739,7 @@ class WeatherSkill(MycroftSkill):
     def handle_isit_snowing(self, message):
         """ Handler for utterances similar to "is it snowing today?"
         """
-        report = self.__populate_report(message)
-
-        if report is None:
-            self.__report_no_data("weather")
-            return
-
-        dialog = self.__select_condition_dialog(message, report, "snow", "snowing")
-        self.speak_dialog(dialog, report)
+        self.__handle_condition(message, "snow", "snowing")
 
     @intent_handler(
         IntentBuilder("")
@@ -758,14 +751,7 @@ class WeatherSkill(MycroftSkill):
     def handle_isit_clear(self, message):
         """ Handler for utterances similar to "is it clear skies today?"
         """
-        report = self.__populate_report(message)
-
-        if report is None:
-            self.__report_no_data("weather")
-            return
-
-        dialog = self.__select_condition_dialog(message, report, "clear")
-        self.speak_dialog(dialog, report)
+        self.__handle_condition(message, "clear")
 
     @intent_handler(
         IntentBuilder("")
@@ -778,14 +764,7 @@ class WeatherSkill(MycroftSkill):
     def handle_isit_cloudy(self, message):
         """ Handler for utterances similar to "is it cloudy skies today?"
         """
-        report = self.__populate_report(message)
-
-        if report is None:
-            self.__report_no_data("weather")
-            return
-
-        dialog = self.__select_condition_dialog(message, report, "cloudy")
-        self.speak_dialog(dialog, report)
+        self.__handle_condition(message, "cloudy")
 
     @intent_handler(
         IntentBuilder("")
@@ -797,14 +776,7 @@ class WeatherSkill(MycroftSkill):
     def handle_isit_foggy(self, message):
         """ Handler for utterances similar to "is it foggy today?"
         """
-        report = self.__populate_report(message)
-
-        if report is None:
-            self.__report_no_data("weather")
-            return
-
-        dialog = self.__select_condition_dialog(message, report, "fog", "foggy")
-        self.speak_dialog(dialog, report)
+        self.__handle_condition(message, "fog", "foggy")
 
     @intent_handler(
         IntentBuilder("")
@@ -816,14 +788,7 @@ class WeatherSkill(MycroftSkill):
     def handle_isit_raining(self, message):
         """ Handler for utterances similar to "is it raining today?"
         """
-        report = self.__populate_report(message)
-
-        if report is None:
-            self.__report_no_data("weather")
-            return
-
-        dialog = self.__select_condition_dialog(message, report, "rain", "raining")
-        self.speak_dialog(dialog, report)
+        self.__handle_condition(message, "rain", "raining")
 
     @intent_handler("do.i.need.an.umbrella.intent")
     def handle_need_umbrella(self, message):
@@ -839,14 +804,7 @@ class WeatherSkill(MycroftSkill):
     def handle_isit_storming(self, message):
         """ Handler for utterances similar to "is it storming today?"
         """
-        report = self.__populate_report(message)
-
-        if report is None:
-            self.__report_no_data("weather")
-            return
-
-        dialog = self.__select_condition_dialog(message, report, "storm")
-        self.speak_dialog(dialog, report)
+        self.__handle_condition(message, "storm")
 
     # Handle: When will it rain again?
     @intent_handler(
@@ -1187,6 +1145,19 @@ class WeatherSkill(MycroftSkill):
             "scale": self.translate(temp_unit or self.__get_temperature_unit()),
         }
 
+    def __handle_condition(self, message, condition_noun, condition_verb=None):
+        """ Common handler for intents asking about a condition such as rain.
+        """
+        report = self.__populate_report(message)
+        if report is None:
+            self.__report_no_data("weather")
+            return
+
+        dialog = self.__select_condition_dialog(
+            message, report, condition_noun, condition_verb
+        )
+        self.speak_dialog(dialog, report)
+
     def __handle_typed(self, message, response_type):
         # Get a date from requests like "weather for next Tuesday"
         today, _ = extract_datetime("today")
@@ -1217,16 +1188,16 @@ class WeatherSkill(MycroftSkill):
 
         # Check if user is asking for a specific time today
         if when.date() == today.date() and when.time() != today.time():
-            self.log.info("Forecast for time: {}".format(when))
+            self.log.debug("Forecast for time: {}".format(when))
             return self.__populate_for_time(report, when, unit)
         # Check if user is asking for a specific day
         elif today.date() != when.date():
             # Doesn't seem to be hitable, safety?
-            self.log.info("Forecast for: {} {}".format(today, when))
+            self.log.debug("Forecast for: {} {}".format(today, when))
             return self.__populate_forecast(report, when, unit, preface_day=True)
         # Otherwise user is asking for weather right now
         else:
-            self.log.info("Forecast for now")
+            self.log.debug("Forecast for now")
             return self.__populate_current(report, unit)
 
         return None
