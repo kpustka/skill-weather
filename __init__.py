@@ -194,9 +194,6 @@ class WeatherSkill(MycroftSkill):
         future_weather = self.owm.daily_forecast(
             report["full_location"], report["lat"], report["lon"], limit=5
         )
-        if future_weather is None:
-            self.__report_no_data("weather")
-            return
 
         f = future_weather.get_forecast()
         forecast_list = self.get_coming_days_forecast(f, self.__get_temperature_unit())
@@ -228,10 +225,6 @@ class WeatherSkill(MycroftSkill):
                 return self.handle_forecast(message)
 
             report = self.__populate_report(message)
-
-            if report is None:
-                self.__report_no_data("weather")
-                return
 
             self.__report_weather(
                 "current", report, separate_min_max="Location" not in message.data
@@ -375,6 +368,10 @@ class WeatherSkill(MycroftSkill):
     def handle_next_hour(self, message):
         report = self.__initialize_report(message)
 
+        if forecastWeather is None:
+            self.__report_no_data("weather")
+            return
+
         # Get near-future forecast
         forecastWeather = (
             self.owm.three_hours_forecast(
@@ -383,10 +380,6 @@ class WeatherSkill(MycroftSkill):
             .get_forecast()
             .get_weathers()[0]
         )
-
-        if forecastWeather is None:
-            self.__report_no_data("weather")
-            return
 
         # NOTE: The 3-hour forecast uses different temperature labels,
         # temp, temp_min and temp_max.
@@ -419,9 +412,6 @@ class WeatherSkill(MycroftSkill):
         else:
             report = self.__populate_report(message)
 
-            if report is None:
-                self.__report_no_data("weather")
-                return
             self.__report_weather("at.time", report)
 
     @intent_handler(
@@ -1168,8 +1158,6 @@ class WeatherSkill(MycroftSkill):
             self.log.debug("Doing a forecast {} {}".format(today, when))
             return self.report_forecast(report, when, dialog=response_type)
         report = self.__populate_report(message)
-        if report is None:
-            return self.__report_no_data("weather")
 
         if report.get("time"):
             self.__report_weather("at.time", report, response_type)
@@ -1418,10 +1406,6 @@ class WeatherSkill(MycroftSkill):
                                 eg "on Tuesday" but NOT "on tomorrow"
         """
         report = self.__populate_forecast(report, when, unit, preface_day)
-        if report is None:
-            data = {"day": self.__to_day(when, preface_day)}
-            self.__report_no_data("weather", data)
-            return
 
         self.__report_weather("forecast", report, rtype=dialog)
 
@@ -1494,6 +1478,10 @@ class WeatherSkill(MycroftSkill):
             separate_min_max (bool): a separate dialog for min max temperatures
                                      will be output if True (default: False)
         """
+
+        if report is None:
+            self.__report_no_data("weather")
+            return
 
         # Convert code to matching weather icon on Mark 1
         if report["location"]:
