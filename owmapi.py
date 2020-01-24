@@ -39,7 +39,6 @@ class OWMApi(Api):
         self.forecast = ForecastParser()
         self.query_cache = {}
         self.location_translations = {}
-        LOG.info("INITIALIZED")
 
     @staticmethod
     def get_language(lang):
