@@ -96,7 +96,7 @@ class WeatherSkill(MycroftSkill):
     ##### INTENT HANDLERS #####
     ###########################
 
-    # DATETIME BASED QUERIES
+    # SINGLE DAY DATETIME BASED QUERIES
     # Handle: what is the weather like?
     @intent_handler(
         IntentBuilder("")
@@ -108,12 +108,10 @@ class WeatherSkill(MycroftSkill):
     )
     def handle_current_weather(self, message):
         try:
-            self.log.debug("Handler: handle_current_weather")
             # Get a date from requests like "weather for next Tuesday"
             today, _ = extract_datetime("today")
             when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
             if today != when:
-                self.log.debug("Doing a forecast {} {}".format(today, when))
                 return self.handle_forecast(message)
 
             report = self.__populate_report(message)
@@ -144,78 +142,6 @@ class WeatherSkill(MycroftSkill):
     )
     def handle_current_weather_simple(self, message):
         self.handle_current_weather(message)
-
-    @intent_handler("what.is.three.day.forecast.intent")
-    def handle_three_day_forecast(self, message):
-        """ Handler for three day forecast without specified location
-
-        Examples:   "What is the 3 day forecast?"
-                    "What is the weather forecast?"
-        """
-        try:
-            self.report_multiday_forecast(report)
-        except APIErrors as e:
-            self.__api_error(e)
-        except Exception as e:
-            self.log.exception("Error: {0}".format(e))
-
-    @intent_handler("what.is.three.day.forecast.location.intent")
-    def handle_three_day_forecast_location(self, message):
-        """ Handler for three day forecast for a specific location
-
-        Example: "What is the 3 day forecast for London?"
-        """
-        # padatious lowercases everything including these keys
-        message.data["Location"] = message.data.pop("location")
-        return self.handle_three_day_forecast(message)
-
-    @intent_handler("what.is.two.day.forecast.intent")
-    def handle_two_day_forecast(self, message):
-        """ Handler for two day forecast with no specified location
-
-        Examples:   "What's the weather like next Monday and Tuesday?"
-                    "What's the weather gonna be like in the coming days?"
-        """
-        # TODO consider merging in weekend intent
-        if message.data.get("day_one"):
-            # report two or more specific days
-            days = []
-            day_num = 1
-            day = message.data["day_one"]
-            while day:
-                day_dt, _ = extract_datetime(day)
-                days.append(day_dt)
-                day_num += 1
-                next_day = "day_{}".format(pronounce_number(day_num))
-                day = message.data.get(next_day)
-
-        try:
-            if message.data.get("day_one"):
-                # report two or more specific days
-                self.report_multiday_forecast(report, set_days=days)
-            else:
-                # report next two days
-                self.report_multiday_forecast(report, num_days=2)
-
-        except APIErrors as e:
-            self.__api_error(e)
-        except Exception as e:
-            self.log.exception("Error: {0}".format(e))
-
-    @intent_handler("what.is.multi.day.forecast.intent")
-    def handle_multi_day_forecast(self, message):
-        """ Handler for multiple day forecast with no specified location
-
-        Examples:   "What's the weather like in the next 4 days?"
-        """
-        # report x number of days
-        when, _ = extract_datetime("tomorrow")
-        num_days = int(extract_number(message.data["num"]))
-
-        if self.voc_match(message.data["num"], "Couple"):
-            self.report_multiday_forecast(report, num_days=2)
-
-        self.report_multiday_forecast(report, when, num_days=num_days)
 
     # Handle: What is the weather forecast tomorrow?
     @intent_handler(
@@ -299,43 +225,99 @@ class WeatherSkill(MycroftSkill):
 
             self.__report_weather("at.time", report)
 
+    # MULTI-DAY DATETIME BASED QUERIES
+    @intent_handler("what.is.three.day.forecast.intent")
+    def handle_three_day_forecast(self, message):
+        """ Handler for three day forecast without specified location
+
+        Examples:   "What is the 3 day forecast?"
+                    "What is the weather forecast?"
+        """
+        try:
+            self.report_multiday_forecast(report)
+        except APIErrors as e:
+            self.__api_error(e)
+        except Exception as e:
+            self.log.exception("Error: {0}".format(e))
+
+    @intent_handler("what.is.three.day.forecast.location.intent")
+    def handle_three_day_forecast_location(self, message):
+        """ Handler for three day forecast for a specific location
+
+        Example: "What is the 3 day forecast for London?"
+        """
+        # padatious lowercases everything including these keys
+        message.data["Location"] = message.data.pop("location")
+        return self.handle_three_day_forecast(message)
+
+    @intent_handler("what.is.two.day.forecast.intent")
+    def handle_two_day_forecast(self, message):
+        """ Handler for two day forecast with no specified location
+
+        Examples:   "What's the weather like next Monday and Tuesday?"
+                    "What's the weather gonna be like in the coming days?"
+        """
+        # TODO consider merging in weekend intent
+        if message.data.get("day_one"):
+            # report two or more specific days
+            days = []
+            day_num = 1
+            day = message.data["day_one"]
+            while day:
+                day_dt, _ = extract_datetime(day)
+                days.append(day_dt)
+                day_num += 1
+                next_day = "day_{}".format(pronounce_number(day_num))
+                day = message.data.get(next_day)
+
+        try:
+            if message.data.get("day_one"):
+                # report two or more specific days
+                self.report_multiday_forecast(report, set_days=days)
+            else:
+                # report next two days
+                self.report_multiday_forecast(report, num_days=2)
+
+        except APIErrors as e:
+            self.__api_error(e)
+        except Exception as e:
+            self.log.exception("Error: {0}".format(e))
+
+    @intent_handler("what.is.multi.day.forecast.intent")
+    def handle_multi_day_forecast(self, message):
+        """ Handler for multiple day forecast with no specified location
+
+        Examples:   "What's the weather like in the next 4 days?"
+        """
+        # report x number of days
+        when, _ = extract_datetime("tomorrow")
+        num_days = int(extract_number(message.data["num"]))
+
+        if self.voc_match(message.data["num"], "Couple"):
+            self.report_multiday_forecast(report, num_days=2)
+
+        self.report_multiday_forecast(report, when, num_days=num_days)
+
     @intent_handler(
         IntentBuilder("")
         .require("Query")
         .one_of("Weather", "Forecast")
         .require("Weekend")
-        .require("Next")
-        .optionally("Location")
-        .build()
-    )
-    def handle_next_weekend_weather(self, message):
-        """ Handle next weekends weather """
-        when, _ = extract_datetime("next saturday", lang="en-us")
-        report_one = self.__populate_forecast(message, when, preface_day=True)
-        self.__report_weather("forecast", report_one, rtype=dialog)
-
-        when, _ = extract_datetime("next sunday", lang="en-us")
-        report_two = self.__populate_forecast(message, when, preface_day=True)
-        self.__report_weather("forecast", report_two, rtype=dialog)
-
-    @intent_handler(
-        IntentBuilder("")
-        .require("Query")
-        .one_of("Weather", "Forecast")
-        .require("Weekend")
+        .optionally("Next")
         .optionally("Location")
         .build()
     )
     def handle_weekend_weather(self, message):
-        """ Handle weather for weekend. """
-        # Get a date from spoken request
-        when, _ = extract_datetime("this saturday", lang="en-us")
-        report_one = self.__populate_forecast(message, when, preface_day=True)
-        self.__report_weather("forecast", report_one, rtype=dialog)
+        """ Handle next weekends weather """
+        if message.data.get("Next") is not None:
+            days = ["next saturday", "next sunday"]
+        else:
+            days = ["this saturday", "this sunday"]
 
-        when, _ = extract_datetime("this sunday", lang="en-us")
-        report_two = self.__populate_forecast(message, when, preface_day=True)
-        self.__report_weather("forecast", report_two, rtype=dialog)
+        for day in days:
+            when, _ = extract_datetime(day, lang="en-us")
+            report = self.__populate_forecast(message, when, preface_day=True)
+            self.__report_weather("forecast", report)
 
     @intent_handler(
         IntentBuilder("")
@@ -719,6 +701,7 @@ class WeatherSkill(MycroftSkill):
     @intent_handler(
         IntentBuilder("")
         .require("When")
+        .optionally("Again")
         .optionally("Next")
         .require("Precipitation")
         .optionally("Location")
