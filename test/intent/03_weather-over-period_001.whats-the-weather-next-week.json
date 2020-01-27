@@ -1,4 +1,5 @@
 {
     "utterance": "what is the weather next weekend",
-    "intent_type": "handle_weekend_weather"
+    "intent_type": "handle_weekend_weather",
+    "expected_dialog": ["forecast.local.weather", "forecast.local.weather"]
 }

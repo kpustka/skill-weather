@@ -1,4 +1,5 @@
 {
     "utterance": "what will the weather be for the next few days",
-    "intent_type": "what.is.multi.day.forecast.intent"
+    "intent_type": "what.is.multi.day.forecast.intent",
+    "expected_dialog": ["current.local.weather", "forecast.local.weather"]
 }

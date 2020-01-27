@@ -162,7 +162,7 @@ class WeatherSkill(MycroftSkill):
             return
 
         report = self.__populate_forecast(message, when, preface_day=True)
-        self.__report_weather("forecast", report, rtype="weather")
+        self.__report_weather("forecast", report)
 
         # Establish the daily cadence
         self.schedule_for_daily_use()
@@ -226,6 +226,19 @@ class WeatherSkill(MycroftSkill):
             self.__report_weather("at.time", report)
 
     # MULTI-DAY DATETIME BASED QUERIES
+    @intent_handler("what.is.multi.day.forecast.intent")
+    def handle_multi_day_forecast(self, message):
+        """ Handler for multiple day forecast with no specified location
+
+        Examples:   "What's the weather like in the next 4 days?"
+        """
+        if self.voc_match(message.data["num"], "Couple"):
+            message.data["num"] = "two"
+        num_days = int(extract_number(message.data["num"]))
+
+        reports = self.__populate_multi_day(message, num_days=num_days)
+        self.__report_multi_day(reports)
+
     @intent_handler("what.is.three.day.forecast.intent")
     def handle_three_day_forecast(self, message):
         """ Handler for three day forecast without specified location
@@ -234,7 +247,8 @@ class WeatherSkill(MycroftSkill):
                     "What is the weather forecast?"
         """
         try:
-            self.report_multiday_forecast(report)
+            reports = self.__populate_multi_day(message, num_days=3)
+            self.__report_multi_day(reports)
         except APIErrors as e:
             self.__api_error(e)
         except Exception as e:
@@ -254,49 +268,25 @@ class WeatherSkill(MycroftSkill):
     def handle_two_day_forecast(self, message):
         """ Handler for two day forecast with no specified location
 
-        Examples:   "What's the weather like next Monday and Tuesday?"
-                    "What's the weather gonna be like in the coming days?"
+        Examples:   "What's the weather like next Monday and Wednesday?"
         """
-        # TODO consider merging in weekend intent
-        if message.data.get("day_one"):
-            # report two or more specific days
-            days = []
-            day_num = 1
-            day = message.data["day_one"]
-            while day:
-                day_dt, _ = extract_datetime(day)
-                days.append(day_dt)
-                day_num += 1
-                next_day = "day_{}".format(pronounce_number(day_num))
-                day = message.data.get(next_day)
-
         try:
-            if message.data.get("day_one"):
-                # report two or more specific days
-                self.report_multiday_forecast(report, set_days=days)
-            else:
-                # report next two days
-                self.report_multiday_forecast(report, num_days=2)
+            today, _ = extract_datetime("today")
+            day_one_dt, _ = extract_datetime(message.data.get("day_one"))
+            day_two_dt, _ = extract_datetime(message.data.get("day_two"))
+            days = [day_one_dt, day_two_dt]
+            reports = []
+            for day in days:
+                if day == today:
+                    reports.append(self.__populate_current(message))
+                else:
+                    reports.append(self.__populate_forecast(message, day))
+            self.__report_multi_day(reports)
 
         except APIErrors as e:
             self.__api_error(e)
         except Exception as e:
             self.log.exception("Error: {0}".format(e))
-
-    @intent_handler("what.is.multi.day.forecast.intent")
-    def handle_multi_day_forecast(self, message):
-        """ Handler for multiple day forecast with no specified location
-
-        Examples:   "What's the weather like in the next 4 days?"
-        """
-        # report x number of days
-        when, _ = extract_datetime("tomorrow")
-        num_days = int(extract_number(message.data["num"]))
-
-        if self.voc_match(message.data["num"], "Couple"):
-            self.report_multiday_forecast(report, num_days=2)
-
-        self.report_multiday_forecast(report, when, num_days=num_days)
 
     @intent_handler(
         IntentBuilder("")
@@ -565,9 +555,9 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report.get("time"):
-            self.__report_weather("at.time", report, response_type)
+            self.__report_weather("at.time", report, rtype=response_type)
         else:
-            self.__report_weather("current", report, response_type)
+            self.__report_weather("current", report, rtype=response_type)
         self.display_mark2_forecast(report)
 
     @intent_handler(
@@ -1151,7 +1141,7 @@ class WeatherSkill(MycroftSkill):
 
         Returns: None if no report available otherwise dict with weather info
         """
-        self.log.debug("Forecast for future: {} {}".format(today, when))
+        self.log.debug("Forecast for future: {}".format(when))
         report = report or self.__initialize_report(message)
         forecast_weather = self.__get_forecast(
             when, report["full_location"], report["lat"], report["lon"]
@@ -1182,6 +1172,26 @@ class WeatherSkill(MycroftSkill):
         report["day"] = self.__to_speakable_day(when, preface_day)
 
         return report
+
+    def __populate_multi_day(self, message, when=None, num_days=2):
+        """ Populate report for multiple days
+
+        Arguments:
+            message: Message object from Bus
+            when (datetime):  starting date for reports
+            num_days (int):  number of days to return
+
+        Returns: List of reports equal to num_days requested.
+        One or more reports may be None if unavailable.
+        """
+        reports = []
+        reports.append(self.__populate_report(message))
+        if when is None:
+            when, _ = extract_datetime("today")
+        for i in range(num_days - 1):
+            when += timedelta(days=1)
+            reports.append(self.__populate_forecast(message, when))
+        return reports
 
     ###########################
     ##### CACHE FORECASTS #####
@@ -1277,76 +1287,34 @@ class WeatherSkill(MycroftSkill):
     ##### SPEAK REPORT #####
     ########################
 
-    def __report_no_data(self, report_type, data=None):
+    def __report_no_data(self, error_type="weather", data=None):
         """ Do processes when Report Processes malfunction
         Arguments:
-            report_type (str): Report type where the error was from
+            error_type (str): Report type where the error was from
                     i.e. 'weather', 'location'
             data (dict): Needed data for dialog on weather error processing
         Returns:
             None
         """
-        if report_type == "weather":
+        if error_type == "weather":
             if data is None:
                 self.speak_dialog("cant.get.forecast")
             else:
                 self.speak_dialog("no.forecast", data)
-        elif report_type == "location":
+        elif error_type == "location":
             self.speak_dialog("location.not.found")
 
-    def report_multiday_forecast(
-        self,
-        report=None,
-        when=None,
-        num_days=3,
-        set_days=None,
-        dialog="weather",
-        unit=None,
-        preface_day=True,
-    ):
-        """ Speak forecast for multiple sequential days.
-
-        Arguments:
-            report (dict): report base
-            when (datetime): date of first day for report, defaults to today
-            num_days (int): number of days to report, defaults to 3
-            set_days (list(datetime)): list of specific days to report
-            dialog (str): dialog type, defaults to 'weather'
-            unit: Unit type to use when presenting, defaults to user preference
-            preface_day (bool): if appropriate day preface should be added
-                                eg "on Tuesday" but NOT "on tomorrow"
-        """
-        # TODO Split into populating and reporting
-        # TODO consolidate with __get_multiday_forecast
-        today, _ = extract_datetime("today")
-        if when is None:
-            when = today
-
-        if set_days:
-            days = set_days
-        else:
-            days = [when + timedelta(days=i) for i in range(num_days)]
-
-        no_report = list()
-        for day in days:
-            if day == today:
-                report = self.__populate_current(message, report, day)
-                report["day"] = self.__to_speakable_day(day, preface_day)
-                self.__report_weather("forecast", report, rtype=dialog)
+    def __report_multi_day(self, reports):
+        reports = [r for r in reports if r is not None]
+        if len(reports) == 0:
+            self.__report_no_data()
+            return False
+        for report in reports:
+            if self.voc_match(report["day"], "Today"):
+                self.__report_weather("current", report)
             else:
-                report = self.__populate_forecast(
-                    message, day, report, unit, preface_day
-                )
-                if report is None:
-                    no_report.append(self.__to_speakable_day(day, False))
-                    continue
-                self.__report_weather("forecast", report, rtype=dialog)
-
-        if no_report:
-            dates = join_list(no_report, "and")
-            dates = self.translate("on") + " " + dates
-            data = {"day": dates}
-            self.__report_no_data("weather", data)
+                self.__report_weather("forecast", report)
+        return True
 
     def __report_sun_time(self, type, dt):
         if time.tzname == ("UTC", "UTC"):
