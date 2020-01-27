@@ -553,11 +553,11 @@ class WeatherSkill(MycroftSkill):
     #### Temperature Intents ####
     def __handle_temperature_intent(self, message, response_type):
         # Get a date from requests like "weather for next Tuesday"
+        self.log.info(message.data.keys())
         today, _ = extract_datetime("today")
         when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
 
         if today.date() != when.date():
-            self.log.debug("Doing a forecast {} {}".format(today, when))
             report = self.__populate_forecast(message, when, preface_day=True)
             self.__report_weather("forecast", report, rtype=response_type)
             return
@@ -578,6 +578,7 @@ class WeatherSkill(MycroftSkill):
         .optionally("Unit")
         .optionally("Today")
         .optionally("Now")
+        .optionally("RelativeTime")
         .build()
     )
     def handle_current_temperature(self, message):
@@ -1035,28 +1036,25 @@ class WeatherSkill(MycroftSkill):
         # Get a date from requests like "weather for next Tuesday"
         today, _ = extract_datetime("today")
         when, _ = extract_datetime(utterance, lang=self.lang)
-        self.log.debug("extracted when: {}".format(when))
+        self.log.debug("Extracted datetime: {}".format(when))
 
-        # Check if user is asking for a specific time today
-        # TODO should this extend to days != today?
-        if when.date() == today.date() and when.time() != today.time():
-            self.log.debug("Forecast for time: {}".format(when))
+        # Check if user is asking for a specific time
+        if message.data.get("RelativeTime") or when.time() != today.time():
             return self.__populate_for_time(when, report, unit)
         # Check if user is asking for a specific day
         elif today.date() != when.date():
             # Doesn't seem to be hitable, safety?
-            self.log.debug("Forecast for future: {} {}".format(today, when))
             return self.__populate_forecast(
                 message, when, report, unit, preface_day=True
             )
         # Otherwise user is asking for weather right now
         else:
-            self.log.debug("Forecast for now")
             return self.__populate_current(message, report, unit)
 
         return None
 
     def __populate_for_time(self, when, report, unit=None):
+        self.log.debug("Forecast for time: {}".format(when))
         # TODO localize time to report location
         three_hr_fcs = self.owm.three_hours_forecast(
             report["full_location"], report["lat"], report["lon"]
@@ -1153,6 +1151,7 @@ class WeatherSkill(MycroftSkill):
 
         Returns: None if no report available otherwise dict with weather info
         """
+        self.log.debug("Forecast for future: {} {}".format(today, when))
         report = report or self.__initialize_report(message)
         forecast_weather = self.__get_forecast(
             when, report["full_location"], report["lat"], report["lon"]
