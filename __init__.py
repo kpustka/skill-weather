@@ -235,7 +235,7 @@ class WeatherSkill(MycroftSkill):
             self.handle_current_weather(message)
             return
 
-        report = self.__populate_forecast(when, preface_day=True)
+        report = self.__populate_forecast(message, when, preface_day=True)
         self.__report_weather("forecast", report, rtype="weather")
 
         # Establish the daily cadence
@@ -311,11 +311,11 @@ class WeatherSkill(MycroftSkill):
     def handle_next_weekend_weather(self, message):
         """ Handle next weekends weather """
         when, _ = extract_datetime("next saturday", lang="en-us")
-        report_one = self.__populate_forecast(when, preface_day=True)
+        report_one = self.__populate_forecast(message, when, preface_day=True)
         self.__report_weather("forecast", report_one, rtype=dialog)
 
         when, _ = extract_datetime("next sunday", lang="en-us")
-        report_two = self.__populate_forecast(when, preface_day=True)
+        report_two = self.__populate_forecast(message, when, preface_day=True)
         self.__report_weather("forecast", report_two, rtype=dialog)
 
     @intent_handler(
@@ -330,11 +330,11 @@ class WeatherSkill(MycroftSkill):
         """ Handle weather for weekend. """
         # Get a date from spoken request
         when, _ = extract_datetime("this saturday", lang="en-us")
-        report_one = self.__populate_forecast(report, preface_day=True)
+        report_one = self.__populate_forecast(message, when, preface_day=True)
         self.__report_weather("forecast", report_one, rtype=dialog)
 
         when, _ = extract_datetime("this sunday", lang="en-us")
-        report_two = self.__populate_forecast(report, preface_day=True)
+        report_two = self.__populate_forecast(message, when, preface_day=True)
         self.__report_weather("forecast", report_two, rtype=dialog)
 
     @intent_handler(
@@ -355,9 +355,9 @@ class WeatherSkill(MycroftSkill):
         days = [when + timedelta(days=i) for i in range(7)]
         # Fetch forecasts/reports for week
         forecasts = [
-            dict(self.__populate_forecast(day, preface_day=False))
+            dict(self.__populate_forecast(message, day, preface_day=False))
             if day != today
-            else dict(self.__populate_current())
+            else dict(self.__populate_current(message))
             for day in days
         ]
 
@@ -576,7 +576,7 @@ class WeatherSkill(MycroftSkill):
 
         if today.date() != when.date():
             self.log.debug("Doing a forecast {} {}".format(today, when))
-            report = self.__populate_forecast(when, preface_day=True)
+            report = self.__populate_forecast(message, when, preface_day=True)
             self.__report_weather("forecast", report, rtype=response_type)
             return
 
@@ -1063,18 +1063,18 @@ class WeatherSkill(MycroftSkill):
         elif today.date() != when.date():
             # Doesn't seem to be hitable, safety?
             self.log.debug("Forecast for future: {} {}".format(today, when))
-            return self.__populate_forecast(when, report, unit, preface_day=True)
+            return self.__populate_forecast(
+                message, when, report, unit, preface_day=True
+            )
         # Otherwise user is asking for weather right now
         else:
             self.log.debug("Forecast for now")
-            return self.__populate_current(report, unit)
+            return self.__populate_current(message, report, unit)
 
         return None
 
-    def __populate_for_time(self, when, report=None, unit=None):
-        report = report or self.__initialize_report(message)
+    def __populate_for_time(self, when, report, unit=None):
         # TODO localize time to report location
-
         three_hr_fcs = self.owm.three_hours_forecast(
             report["full_location"], report["lat"], report["lon"]
         )
@@ -1112,7 +1112,7 @@ class WeatherSkill(MycroftSkill):
 
         return report
 
-    def __populate_current(self, report=None, unit=None):
+    def __populate_current(self, message, report=None, unit=None):
         report = report or self.__initialize_report(message)
 
         # Get current conditions
@@ -1157,12 +1157,15 @@ class WeatherSkill(MycroftSkill):
 
         return report
 
-    def __populate_forecast(self, when=None, report=None, unit=None, preface_day=False):
+    def __populate_forecast(
+        self, message, when=None, report=None, unit=None, preface_day=False
+    ):
         """ Populate the report and return it.
 
         Arguments:
-            report (dict): report base
+            message: Message object from Bus
             when : date for report
+            report (dict): report base
             unit: Unit type to use when presenting
 
         Returns: None if no report available otherwise dict with weather info
@@ -1333,7 +1336,6 @@ class WeatherSkill(MycroftSkill):
         """
         # TODO Split into populating and reporting
         # TODO consolidate with __get_multiday_forecast
-        report = report or self.__initialize_report(message)
         today, _ = extract_datetime("today")
         if when is None:
             when = today
@@ -1346,11 +1348,13 @@ class WeatherSkill(MycroftSkill):
         no_report = list()
         for day in days:
             if day == today:
-                self.__populate_current(report, day)
+                report = self.__populate_current(message, report, day)
                 report["day"] = self.__to_speakable_day(day, preface_day)
                 self.__report_weather("forecast", report, rtype=dialog)
             else:
-                report = self.__populate_forecast(day, report, unit, preface_day)
+                report = self.__populate_forecast(
+                    message, day, report, unit, preface_day
+                )
                 if report is None:
                     no_report.append(self.__to_speakable_day(day, False))
                     continue
