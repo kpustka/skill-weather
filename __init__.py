@@ -926,41 +926,25 @@ class WeatherSkill(MycroftSkill):
         .build()
     )
     def handle_sunrise(self, message):
-        # NB: OWM only has sunrise data for current day
         report = self.__initialize_report(message)
+        weather = self.owm.weather_at_place(
+            report["full_location"], report["lat"], report["lon"]
+        ).get_weather()
 
-        when, _ = extract_datetime(message.data.get("utterance"))
-        today, _ = extract_datetime("today")
-        if when == today:
-            weather = self.owm.weather_at_place(
-                report["full_location"], report["lat"], report["lon"]
-            ).get_weather()
-
-            if weather is None:
-                self.__report_no_data("weather")
-                return
-        else:
-            # Get forecast for that day
-            # weather = self.__get_forecast(when, report['full_location'],
-            #                               report['lat'], report['lon'])
-
-            # There appears to be a bug in OWM, it can't extract the sunrise/
-            # sunset from forecast objects.  As of March 2018 OWM said it was
-            # "in the roadmap". Just say "I don't know" for now
-            weather = None
-        if not weather or weather.get_humidity() == 0:
-            self.speak_dialog("do not know")
+        if weather is None:
+            self.__report_no_data("weather")
             return
 
+        # OWM only has sunrise data for current day
+        # Warn user and continue to provide time for today
+        when, _ = extract_datetime(message.data.get("utterance"))
+        today, _ = extract_datetime("today")
+        if when.date() != today.date():
+            self.speak_dialog("sunrise.data.today.only")
+
         # uses device tz so if not set (eg Mark 1) this is UTC.
-        dtSunrise = datetime.fromtimestamp(weather.get_sunrise_time())
-        if time.tzname == ("UTC", "UTC"):
-            dtSunrise = to_local(
-                dtSunrise.replace(tzinfo=pytz.utc),
-                location_code=self.location["timezone"]["code"],
-            )
-        spoken_time = nice_time(dtSunrise, use_ampm=True)
-        self.speak_dialog("sunrise", {"time": spoken_time})
+        dt = datetime.fromtimestamp(weather.get_sunrise_time())
+        self.__report_sun_time("sunrise", dt)
 
     # Handle: When is the sunset?
     @intent_handler(
@@ -972,39 +956,24 @@ class WeatherSkill(MycroftSkill):
     )
     def handle_sunset(self, message):
         report = self.__initialize_report(message)
+        weather = self.owm.weather_at_place(
+            report["full_location"], report["lat"], report["lon"]
+        ).get_weather()
 
-        when, _ = extract_datetime(message.data.get("utterance"))
-        today, _ = extract_datetime("today")
-        if when == today:
-            weather = self.owm.weather_at_place(
-                report["full_location"], report["lat"], report["lon"]
-            ).get_weather()
-
-            if weather is None:
-                self.__report_no_data("weather")
-                return
-        else:
-            # Get forecast for that day
-            # weather = self.__get_forecast(when, report['full_location'],
-            #                               report['lat'], report['lon'])
-
-            # There appears to be a bug in OWM, it can't extract the sunrise/
-            # sunset from forecast objects.  As of March 2018 OWM said it was
-            # "in the roadmap". Just say "I don't know" for now
-            weather = None
-        if not weather or weather.get_humidity() == 0:
-            self.speak_dialog("do not know")
+        if weather is None:
+            self.__report_no_data("weather")
             return
 
+        # OWM only has sunset data for current day
+        # Warn user and continue to provide time for today
+        when, _ = extract_datetime(message.data.get("utterance"))
+        today, _ = extract_datetime("today")
+        if when.date() != today.date():
+            self.speak_dialog("sunrise.data.today.only")
+
         # uses device tz so if not set (eg Mark 1) this is UTC.
-        dtSunset = datetime.fromtimestamp(weather.get_sunset_time())
-        if time.tzname == ("UTC", "UTC"):
-            dtSunset = to_local(
-                dtSunset.replace(tzinfo=pytz.utc),
-                location_code=self.location["timezone"]["code"],
-            )
-        spoken_time = nice_time(dtSunset, use_ampm=True)
-        self.speak_dialog("sunset", {"time": spoken_time})
+        dt = datetime.fromtimestamp(weather.get_sunset_time())
+        self.__report_sun_time("sunset", dt)
 
     #########################
     ##### GET FORECASTS #####
@@ -1392,6 +1361,15 @@ class WeatherSkill(MycroftSkill):
             dates = self.translate("on") + " " + dates
             data = {"day": dates}
             self.__report_no_data("weather", data)
+
+    def __report_sun_time(self, type, dt):
+        if time.tzname == ("UTC", "UTC"):
+            dt = to_local(
+                dt.replace(tzinfo=pytz.utc),
+                location_code=self.location["timezone"]["code"],
+            )
+        spoken_time = nice_time(dt, use_ampm=True)
+        self.speak_dialog(type, {"time": spoken_time})
 
     def __report_weather(
         self, timeframe, report, rtype="weather", separate_min_max=False
