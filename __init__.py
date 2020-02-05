@@ -111,7 +111,7 @@ class WeatherSkill(MycroftSkill):
             # Get a date from requests like "weather for next Tuesday"
             today, _ = extract_datetime("today")
             when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
-            if today != when:
+            if today.date() != when.date():
                 return self.handle_forecast(message)
 
             report = self.__populate_report(message)
@@ -154,10 +154,10 @@ class WeatherSkill(MycroftSkill):
     )
     def handle_forecast(self, message):
         # Get a date from spoken request
-        when = extract_datetime(message.data.get("utterance"), lang=self.lang)[0]
-        today = extract_datetime("today")[0]
+        when, _ = extract_datetime(message.data.get("utterance"), lang=self.lang)
+        today, _ = extract_datetime("today")
 
-        if today == when:
+        if today.date() == when.date():
             self.handle_current_weather(message)
             return
 
@@ -997,8 +997,9 @@ class WeatherSkill(MycroftSkill):
                 dt: Reference time
                 days: number of days to get forecast for, defaults to 4
 
-            Returns: List of dicts containg weather info
+            Returns: List of dicts containing weather info
         """
+        # TODO consolidate with __populate_multi_day
         days = days or 4
         weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         forecast_list = []
