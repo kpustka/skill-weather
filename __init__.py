@@ -270,6 +270,19 @@ class OWMApi(Api):
         self.encoding = encodings.get(lang, 'utf8')
 
 
+def weather_day_match(forecast_dt, when):
+    """Check if date of forecast weather matches a specified date.
+
+    Arguments:
+        forecast_dt (datetime): Datetime of forecast weather
+        when (datetime): datetime to compare with
+    Returns:
+        (bool) True if date is the same or if it's within 24 hours.
+"""
+    return (when.date() == forecast_dt.date() or
+            timedelta() < forecast_dt - to_utc(when) < timedelta(days=1))
+
+
 class WeatherSkill(MycroftSkill):
     def __init__(self):
         super().__init__("WeatherSkill")
@@ -1343,6 +1356,9 @@ class WeatherSkill(MycroftSkill):
             report['lon']).get_weather()
 
         if currentWeather is None:
+            self.log.error('Weather report could not be fetched '
+                           'for {} {} {}'.format(report['full_location'],
+                                                 report['lat'], report['lon']))
             return None
 
         today = currentWeather.get_reference_time(timeformat='date')
@@ -1644,8 +1660,10 @@ class WeatherSkill(MycroftSkill):
         forecasts = self.owm.daily_forecast(location, lat, lon, limit=14)
         forecasts = forecasts.get_forecast()
         for weather in forecasts.get_weathers():
-            forecastDate = weather.get_reference_time("date")
-            if forecastDate.date() == when.date():
+            forecast_dt = weather.get_reference_time('date')
+            # Get a time for the current date or a time within 24 hours
+            # of the requested time
+            if weather_day_match(forecast_dt, when):
                 # found the right day, now format up the results
                 return weather
 
