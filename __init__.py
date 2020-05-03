@@ -29,9 +29,9 @@ from mycroft.util.format import nice_date, nice_time
 from mycroft.util.log import LOG
 from mycroft.util.format import nice_number, pronounce_number, join_list
 from mycroft.util.parse import extract_datetime, extract_number
-from pyowm.webapi25.forecaster import Forecaster
-from pyowm.webapi25.forecastparser import ForecastParser
-from pyowm.webapi25.observationparser import ObservationParser
+from pyowm.weatherapi25.forecaster import Forecaster
+from pyowm.weatherapi25.parsers.forecastparser import ForecastParser
+from pyowm.weatherapi25.parsers.observationparser import ObservationParser
 from requests import HTTPError, Response
 
 try:
