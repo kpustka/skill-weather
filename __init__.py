@@ -64,6 +64,7 @@ WINDSTRENGTH_MPS = {
 class WeatherSkill(MycroftSkill):
     def __init__(self):
         super().__init__("WeatherSkill")
+        self.weather_api = OWMApi()
 
         # Build a dictionary to translate OWM weather-conditions
         # codes into the Mycroft weather icon codes
@@ -92,9 +93,8 @@ class WeatherSkill(MycroftSkill):
         #     self.owm = OWM(self.settings["api_key"])
         # else:
         #     self.owm = OWMApi()
-        self.owm = OWMApi()
-        if self.owm:
-            self.owm.set_OWM_language(lang=OWMApi.get_language(self.lang))
+        if self.weather_api:
+            self.weather_api.set_OWM_language(lang=OWMApi.get_language(self.lang))
 
         self.schedule_for_daily_use()
         try:
@@ -122,11 +122,11 @@ class WeatherSkill(MycroftSkill):
         # If not already cached, this will reach out for current conditions
         report = self.__initialize_report(None)
         try:
-            self.owm.weather_at_place(
+            self.weather_api.weather_at_place(
                 report['full_location'], report['lat'],
                 report['lon']).get_weather()
-            self.owm.daily_forecast(report['full_location'],
-                                    report['lat'], report['lon'], limit=16)
+            self.weather_api.daily_forecast(report['full_location'],
+                                            report['lat'], report['lon'], limit=16)
         except Exception as e:
             self.log.error('Failed to prime weather cache '
                            '({})'.format(repr(e)))
@@ -181,9 +181,9 @@ class WeatherSkill(MycroftSkill):
 
     def mark2_forecast(self, report):
         """ Builds forecast for the upcoming days for the Mark-2 display."""
-        future_weather = self.owm.daily_forecast(report['full_location'],
-                                                 report['lat'],
-                                                 report['lon'], limit=5)
+        future_weather = self.weather_api.daily_forecast(report['full_location'],
+                                                         report['lat'],
+                                                         report['lon'], limit=5)
         if future_weather is None:
             self._report_no_data()
             return
@@ -349,7 +349,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__initialize_report(message)
 
         # Get near-future forecast
-        forecastWeather = self.owm.three_hours_forecast(
+        forecastWeather = self.weather_api.three_hours_forecast(
             report['full_location'],
             report['lat'],
             report['lon']).get_forecast().get_weathers()[0]
@@ -726,7 +726,7 @@ class WeatherSkill(MycroftSkill):
                                           lang=self.lang)
 
         # search the forecast for precipitation
-        weathers = self.owm.daily_forecast(
+        weathers = self.weather_api.daily_forecast(
             report['full_location'],
             report['lat'],
             report['lon'], 10).get_forecast()
@@ -787,7 +787,7 @@ class WeatherSkill(MycroftSkill):
                                           lang=self.lang)
         today, _ = self.__extract_datetime("today")
         if when is None or when == today:
-            weather = self.owm.weather_at_place(
+            weather = self.weather_api.weather_at_place(
                 report['full_location'],
                 report['lat'],
                 report['lon']).get_weather()
@@ -819,7 +819,7 @@ class WeatherSkill(MycroftSkill):
         when, _ = self.__extract_datetime(message.data.get('utterance'))
         today, _ = self.__extract_datetime("today")
         if when is None or when == today:
-            weather = self.owm.weather_at_place(
+            weather = self.weather_api.weather_at_place(
                 report['full_location'],
                 report['lat'],
                 report['lon']).get_weather()
@@ -909,7 +909,7 @@ class WeatherSkill(MycroftSkill):
         when, _ = self.__extract_datetime(message.data.get('utterance'))
         today, _ = self.__extract_datetime("today")
         if when is None or when.date() == today.date():
-            weather = self.owm.weather_at_place(
+            weather = self.weather_api.weather_at_place(
                 report['full_location'],
                 report['lat'],
                 report['lon']).get_weather()
@@ -946,7 +946,7 @@ class WeatherSkill(MycroftSkill):
         when, _ = self.__extract_datetime(message.data.get('utterance'))
         today, _ = self.__extract_datetime("today")
         if when is None or when.date() == today.date():
-            weather = self.owm.weather_at_place(
+            weather = self.weather_api.weather_at_place(
                 report['full_location'],
                 report['lat'],
                 report['lon']).get_weather()
@@ -1070,7 +1070,7 @@ class WeatherSkill(MycroftSkill):
         if report is None:
             return None
 
-        three_hr_fcs = self.owm.three_hours_forecast(
+        three_hr_fcs = self.weather_api.three_hours_forecast(
             report['full_location'],
             report['lat'],
             report['lon'])
@@ -1114,7 +1114,7 @@ class WeatherSkill(MycroftSkill):
             return None
 
         # Get current conditions
-        currentWeather = self.owm.weather_at_place(
+        currentWeather = self.weather_api.weather_at_place(
             report['full_location'], report['lat'],
             report['lon']).get_weather()
 
@@ -1138,8 +1138,8 @@ class WeatherSkill(MycroftSkill):
 
         # Change encoding of the localized report to utf8 if needed
         condition = currentWeather.get_detailed_status()
-        if self.owm.encoding != 'utf8':
-            condition.encode(self.owm.encoding).decode('utf8')
+        if self.weather_api.encoding != 'utf8':
+            condition.encode(self.weather_api.encoding).decode('utf8')
         report['condition'] = self.__translate(condition)
         report['condition_cat'] = currentWeather.get_status()
 
@@ -1333,7 +1333,7 @@ class WeatherSkill(MycroftSkill):
 
         # Convert code to matching weather icon on Mark 1
         if report['location']:
-            report['location'] = self.owm.location_translations.get(
+            report['location'] = self.weather_api.location_translations.get(
                 report['location'], report['location'])
         weather_code = str(report['icon'])
         img_code = self.CODES[weather_code]
@@ -1401,7 +1401,7 @@ class WeatherSkill(MycroftSkill):
         """
 
         # search for the requested date in the returned forecast data
-        forecasts = self.owm.daily_forecast(location, lat, lon, limit=14)
+        forecasts = self.weather_api.daily_forecast(location, lat, lon, limit=14)
         forecasts = forecasts.get_forecast()
         for weather in forecasts.get_weathers():
             forecastDate = weather.get_reference_time("date")
