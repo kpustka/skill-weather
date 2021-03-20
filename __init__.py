@@ -185,7 +185,7 @@ class WeatherSkill(MycroftSkill):
                                                  report['lat'],
                                                  report['lon'], limit=5)
         if future_weather is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         f = future_weather.get_forecast()
@@ -217,7 +217,7 @@ class WeatherSkill(MycroftSkill):
             report = self.__populate_report(message)
 
             if report is None:
-                self.__report_no_data('weather')
+                self._report_no_data()
                 return
 
             self.__report_weather(
@@ -355,7 +355,7 @@ class WeatherSkill(MycroftSkill):
             report['lon']).get_forecast().get_weathers()[0]
 
         if forecastWeather is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         # NOTE: The 3-hour forecast uses different temperature labels,
@@ -387,7 +387,7 @@ class WeatherSkill(MycroftSkill):
             report = self.__populate_report(message)
 
             if report is None:
-                self.__report_no_data('weather')
+                self._report_no_data()
                 return
             self.__report_weather("at.time", report)
 
@@ -436,7 +436,7 @@ class WeatherSkill(MycroftSkill):
                      for day in days]
 
         if forecasts is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         # collate forecasts
@@ -572,7 +572,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         if self.__get_speed_unit() == 'mph':
@@ -631,7 +631,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         dialog = self.__select_condition_dialog(message, report,
@@ -646,7 +646,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         dialog = self.__select_condition_dialog(message, report, "clear")
@@ -660,7 +660,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         dialog = self.__select_condition_dialog(message, report, "cloudy")
@@ -674,7 +674,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         dialog = self.__select_condition_dialog(message, report, "fog",
@@ -689,7 +689,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         dialog = self.__select_condition_dialog(message, report, "rain",
@@ -708,7 +708,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_report(message)
 
         if report is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         dialog = self.__select_condition_dialog(message, report, "storm")
@@ -732,7 +732,7 @@ class WeatherSkill(MycroftSkill):
             report['lon'], 10).get_forecast()
 
         if weathers is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         weathers = weathers.get_weathers()
@@ -797,7 +797,7 @@ class WeatherSkill(MycroftSkill):
                 when, report['full_location'], report['lat'], report['lon'])
 
         if weather is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         if weather.get_humidity() == 0:
@@ -829,7 +829,7 @@ class WeatherSkill(MycroftSkill):
                 when, report['full_location'], report['lat'], report['lon'])
 
         if weather is None:
-            self.__report_no_data('weather')
+            self._report_no_data()
             return
 
         if not weather or weather.get_wind() == 0:
@@ -915,7 +915,7 @@ class WeatherSkill(MycroftSkill):
                 report['lon']).get_weather()
 
             if weather is None:
-                self.__report_no_data('weather')
+                self._report_no_data()
                 return
         else:
             # Get forecast for that day
@@ -952,7 +952,7 @@ class WeatherSkill(MycroftSkill):
                 report['lon']).get_weather()
 
             if weather is None:
-                self.__report_no_data('weather')
+                self._report_no_data()
                 return
         else:
             # Get forecast for that day
@@ -1028,7 +1028,7 @@ class WeatherSkill(MycroftSkill):
                                         dialog=response_type)
         report = self.__populate_report(message)
         if report is None:
-            return self.__report_no_data('weather')
+            return self._report_no_data()
 
         if report.get('time'):
             self.__report_weather("at.time", report, response_type)
@@ -1205,23 +1205,6 @@ class WeatherSkill(MycroftSkill):
 
         return report
 
-    def __report_no_data(self, report_type, data=None):
-        """ Do processes when Report Processes malfunction
-        Arguments:
-            report_type (str): Report type where the error was from
-                    i.e. 'weather', 'location'
-            data (dict): Needed data for dialog on weather error processing
-        Returns:
-            None
-        """
-        if report_type == 'weather':
-            if data is None:
-                self.speak_dialog("cant.get.forecast")
-            else:
-                self.speak_dialog("no.forecast", data)
-        elif report_type == 'location':
-            self.speak_dialog('location.not.found')
-
     def __select_condition_dialog(self, message, report, noun, exp=None):
         """ Select the relevant dialog file for condition based reports.
 
@@ -1280,7 +1263,7 @@ class WeatherSkill(MycroftSkill):
         report = self.__populate_forecast(report, when, unit, preface_day)
         if report is None:
             data = {'day': self.__to_day(when, preface_day)}
-            self.__report_no_data('weather', data)
+            self._report_no_data(data)
             return
 
         self.__report_weather('forecast', report, rtype=dialog)
@@ -1328,7 +1311,7 @@ class WeatherSkill(MycroftSkill):
             dates = join_list(no_report, 'and')
             dates = self.translate('on') + ' ' + dates
             data = {'day': dates}
-            self.__report_no_data('weather', data)
+            self._report_no_data(data)
 
     def __report_weather(self, timeframe, report, rtype='weather',
                          separate_min_max=False):
@@ -1525,7 +1508,18 @@ class WeatherSkill(MycroftSkill):
             from mycroft import Message
             self.bus.emit(Message("mycroft.not.paired"))
         else:
-            self.__report_no_data('weather')
+            self._report_no_data()
+
+    def _report_no_data(self, data: dict = None) -> None:
+        """Do processes when Report Processes malfunction
+
+        Arguments:
+            data: Needed data for dialog on weather error processing
+        """
+        if data is None:
+            self.speak_dialog("cant.get.forecast")
+        else:
+            self.speak_dialog("no.forecast", data)
 
     def __to_day(self, when, preface=False):
         """ Provide date in speakable form
