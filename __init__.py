@@ -377,18 +377,6 @@ class WeatherSkill(MycroftSkill):
                 return
             self.__report_weather("at.time", report)
 
-    @intent_handler(IntentBuilder("").require("Query").one_of(
-        "Weather", "Forecast").require("Weekend").require(
-        "Next").optionally("Location").build())
-    def handle_next_weekend_weather(self, message):
-        """ Handle next weekends weather """
-
-        report = self._initialize_report(message)
-        when, _ = self.__extract_datetime('next saturday', lang='en-us')
-        self.report_forecast(report, when)
-        when, _ = self.__extract_datetime('next sunday', lang='en-us')
-        self.report_forecast(report, when)
-
     @intent_handler(IntentBuilder("").require("Query")
                     .one_of("Weather", "Forecast").require("Weekend")
                     .optionally("Location").build())
