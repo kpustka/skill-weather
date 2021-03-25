@@ -107,21 +107,6 @@ class WeatherSkill(MycroftSkill):
             self.log.warning('Could not prepare forecasts. '
                              '({})'.format(repr(e)))
 
-        # self.test_screen()    # DEBUG:  Used during screen testing/debugging
-
-    def test_screen(self):
-        self.gui["current"] = 72
-        self.gui["min"] = 83
-        self.gui["max"] = 5
-        self.gui["location"] = "kansas city"
-        self.gui["condition"] = "sunny"
-        self.gui["icon"] = "sunny"
-        self.gui["weathercode"] = 0
-        self.gui["humidity"] = "100%"
-        self.gui["wind"] = "--"
-
-        self.gui.show_page('weather.qml')
-
     def prime_weather_cache(self):
         # If not already cached, this will reach out for current conditions
         report = self._initialize_report(None)
