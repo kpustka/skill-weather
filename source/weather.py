@@ -156,10 +156,13 @@ class WeatherReport:
         return weather
 
     def get_forecast_for_date(self, intent_data):
-        delta = intent_data.intent_datetime - intent_data.location_datetime
-        day_delta = int(delta / timedelta(days=1))
-        day_index = day_delta + 1
-        forecast = self.daily[day_index]
+        if intent_data.intent_datetime.date() == intent_data.location_datetime.date():
+            forecast = self.daily[0]
+        else:
+            delta = intent_data.intent_datetime - intent_data.location_datetime
+            day_delta = int(delta / timedelta(days=1))
+            day_index = day_delta + 1
+            forecast = self.daily[day_index]
 
         return forecast
 

@@ -60,6 +60,8 @@ class WeatherDialog:
             high_temperature=self.weather.temperature.high,
             low_temperature=self.weather.temperature.low
         )
+        if self.weather.date_time.date() == self.intent_data.location_datetime.date():
+            self.data.update(day="Today")
         self._add_location()
 
     def build_temperature_dialog(self, temperature_type):
